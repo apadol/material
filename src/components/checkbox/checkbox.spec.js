@@ -4,7 +4,6 @@ describe('mdCheckbox', function() {
 
   beforeEach(module('material.components.checkbox'));
   beforeEach(module('ngAria'));
-  beforeEach(TestUtil.mockRaf);
 
   it('should warn developers they need a label', inject(function($compile, $rootScope, $log){
     spyOn($log, "warn");
@@ -50,7 +49,7 @@ describe('mdCheckbox', function() {
     expect(cbElements.eq(0).attr('role')).toEqual('checkbox');
   }));
 
-  it('should be disabled with disabled attr', inject(function($compile, $rootScope) {
+  it('should be disabled with ngDisabled attr', inject(function($compile, $rootScope) {
     var element = $compile('<div>' +
                              '<md-checkbox ng-disabled="isDisabled" ng-model="blue">' +
                              '</md-checkbox>' +
@@ -68,8 +67,58 @@ describe('mdCheckbox', function() {
 
     checkbox.triggerHandler('click');
     expect($rootScope.blue).toBe(true);
+  }));
 
+  it('should preserve existing tabindex', inject(function($compile, $rootScope) {
+    var element = $compile('<div>' +
+                             '<md-checkbox ng-model="blue" tabindex="2">' +
+                             '</md-checkbox>' +
+                           '</div>')($rootScope);
 
+    var checkbox = element.find('md-checkbox');
+    expect(checkbox.attr('tabindex')).toBe('2');
+  }));
+
+  it('should disable with tabindex=-1', inject(function($compile, $rootScope) {
+    var element = $compile('<div>' +
+                             '<md-checkbox ng-disabled="isDisabled" ng-model="blue">' +
+                             '</md-checkbox>' +
+                           '</div>')($rootScope);
+
+    var checkbox = element.find('md-checkbox');
+
+    $rootScope.$apply('isDisabled = true');
+    expect(checkbox.attr('tabindex')).toBe('-1');
+
+    $rootScope.$apply('isDisabled = false');
+    expect(checkbox.attr('tabindex')).toBe('0');
+  }));
+
+  it('should not set focus state on mousedown', inject(function($compile, $rootScope) {
+    var checkbox = $compile('<md-checkbox ng-model="blue">')($rootScope.$new());
+    $rootScope.$apply();
+    checkbox.triggerHandler('mousedown');
+    expect(checkbox[0]).not.toHaveClass('md-focused');
+  }));
+
+  it('should set focus state on focus and remove on blur', inject(function($compile, $rootScope) {
+    var checkbox = $compile('<md-checkbox ng-model="blue">')($rootScope.$new());
+    $rootScope.$apply();
+    checkbox.triggerHandler('focus');
+    expect(checkbox[0]).toHaveClass('md-focused');
+    checkbox.triggerHandler('blur');
+    expect(checkbox[0]).not.toHaveClass('md-focused');
+  }));
+
+  it('should set focus state on keyboard interaction after clicking', inject(function($compile, $rootScope, $mdConstant) {
+    var checkbox = $compile('<md-checkbox ng-model="blue">')($rootScope.$new());
+    $rootScope.$apply();
+    checkbox.triggerHandler('mousedown');
+    checkbox.triggerHandler({
+      type: 'keypress',
+      keyCode: $mdConstant.KEY_CODE.SPACE
+    });
+    expect(checkbox[0]).toHaveClass('md-focused');
   }));
 
   describe('ng core checkbox tests', function() {

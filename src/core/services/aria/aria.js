@@ -19,11 +19,15 @@ function AriaService($$rAF, $log, $window) {
    * @param {optional} defaultValue What to set the attr to if no value is found
    */
   function expect(element, attrName, defaultValue) {
-    var node = element[0];
+    var node = element[0] || element;
 
-    if (!node.hasAttribute(attrName) && !childHasAttribute(node, attrName)) {
+    // if node exists and neither it nor its children have the attribute
+    if (node &&
+       ((!node.hasAttribute(attrName) ||
+        node.getAttribute(attrName).length === 0) &&
+        !childHasAttribute(node, attrName))) {
 
-      defaultValue = angular.isString(defaultValue) && defaultValue.trim() || '';
+      defaultValue = angular.isString(defaultValue) ? defaultValue.trim() : '';
       if (defaultValue.length) {
         element.attr(attrName, defaultValue);
       } else {
@@ -44,8 +48,12 @@ function AriaService($$rAF, $log, $window) {
 
   function expectWithText(element, attrName) {
     expectAsync(element, attrName, function() {
-      return element.text().trim();
+      return getText(element);
     });
+  }
+
+  function getText(element) {
+    return element.text().trim();
   }
 
   function childHasAttribute(node, attrName) {

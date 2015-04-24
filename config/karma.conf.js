@@ -10,7 +10,7 @@ module.exports = function(config) {
       // demos in the tests, and Karma doesn't support advanced
       // globbing.
       'src/components/*/*.js',
-      'src/components/tabs/js/*.js'
+      'src/components/*/js/*.js'
   ];
 
   var COMPILED_SRC = [
@@ -23,20 +23,23 @@ module.exports = function(config) {
   ];
   
   // releaseMode is a custom configuration option.
-  var testSrc = config.releaseMode ? COMPILED_SRC : UNCOMPILED_SRC;
+  var testSrc = process.env.KARMA_TEST_COMPRESSED ? COMPILED_SRC : UNCOMPILED_SRC;
+  var dependencies = process.env.KARMA_TEST_JQUERY ? 
+      ['node_modules/jquery/dist/jquery.js'] : [];
+
+  dependencies = dependencies.concat([
+    'node_modules/angular/angular.js',
+    'node_modules/angular-animate/angular-animate.js',
+    'node_modules/angular-aria/angular-aria.js',
+    'node_modules/angular-mocks/angular-mocks.js',
+    'config/test-utils.js'
+  ]);
 
   config.set({
 
     basePath: __dirname + '/..',
     frameworks: ['jasmine'],
-    files: [
-      // Dependencies
-      'bower_components/angular/angular.js',
-      'bower_components/angular-animate/angular-animate.js',
-      'bower_components/angular-aria/angular-aria.js',
-      'bower_components/angular-mocks/angular-mocks.js',
-      'bower_components/hammerjs/hammer.js'
-    ].concat(testSrc),
+    files: dependencies.concat(testSrc),
 
     port: 9876,
     reporters: ['progress'],

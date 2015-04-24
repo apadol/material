@@ -27,12 +27,13 @@ function InkRippleService($window, $timeout) {
     attachButtonBehavior: attachButtonBehavior,
     attachCheckboxBehavior: attachCheckboxBehavior,
     attachTabBehavior: attachTabBehavior,
+    attachListControlBehavior: attachListControlBehavior,
     attach: attach
   };
 
   function attachButtonBehavior(scope, element, options) {
     return attach(scope, element, angular.extend({
-      isFAB: element.hasClass('md-fab'),
+      fullRipple: true,
       isMenuItem: element.hasClass('md-menu-item'),
       center: false,
       dimBackground: true
@@ -42,7 +43,8 @@ function InkRippleService($window, $timeout) {
   function attachCheckboxBehavior(scope, element, options) {
     return attach(scope, element, angular.extend({
       center: true,
-      dimBackground: false
+      dimBackground: false,
+      fitRipple: true
     }, options));
   }
 
@@ -50,7 +52,17 @@ function InkRippleService($window, $timeout) {
     return attach(scope, element, angular.extend({
       center: false,
       dimBackground: true,
-      outline: true
+      outline: false,
+      rippleSize: 'full'
+    }, options));
+  }
+
+  function attachListControlBehavior(scope, element, options) {
+    return attach(scope, element, angular.extend({
+      center: false,
+      dimBackground: true,
+      outline: false,
+      rippleSize: 'full'
     }, options));
   }
 
@@ -66,11 +78,12 @@ function InkRippleService($window, $timeout) {
       mousedownPauseTime: 150,
       dimBackground: false,
       outline: false,
-      isFAB: false,
-      isMenuItem: false
+      fullRipple: true,
+      isMenuItem: false,
+      fitRipple: false
     }, options);
 
-    var rippleContainer, rippleSize,
+    var rippleSize,
         controller = element.controller('mdInkRipple') || {},
         counter = 0,
         ripples = [],
@@ -79,13 +92,23 @@ function InkRippleService($window, $timeout) {
         isActive = false,
         isHeld = false,
         node = element[0],
-        hammertime = new Hammer(node),
-        color = parseColor(element.attr('md-ink-ripple')) || parseColor($window.getComputedStyle(options.colorElement[0]).color || 'rgb(0, 0, 0)');
+        rippleSizeSetting = element.attr('md-ripple-size'),
+        color = parseColor(element.attr('md-ink-ripple')) || parseColor(options.colorElement.length && $window.getComputedStyle(options.colorElement[0]).color || 'rgb(0, 0, 0)');
+
+    switch (rippleSizeSetting) {
+      case 'full':
+        options.fullRipple = true;
+        break;
+      case 'partial':
+        options.fullRipple = false;
+        break;
+    }
 
     // expose onInput for ripple testing
-    scope._onInput = onInput;
-
-    options.mousedown && hammertime.on('hammer.input', onInput);
+    if (options.mousedown) {
+      element.on('$md.pressdown', onPressDown)
+        .on('$md.pressup', onPressUp);
+    }
 
     controller.createRipple = createRipple;
 
@@ -101,9 +124,25 @@ function InkRippleService($window, $timeout) {
 
     // Publish self-detach method if desired...
     return function detach() {
-      hammertime.destroy();
-      rippleContainer && rippleContainer.remove();
+      element.off('$md.pressdown', onPressDown)
+        .off('$md.pressup', onPressUp);
+      getRippleContainer().remove();
     };
+
+    /**
+     * Gets the current ripple container
+     * If there is no ripple container, it creates one and returns it
+     *
+     * @returns {angular.element} ripple container element
+     */
+    function getRippleContainer() {
+      var container = element.data('$mdRippleContainer');
+      if (container) return container;
+      container = angular.element('<div class="md-ripple-container">');
+      element.append(container);
+      element.data('$mdRippleContainer', container);
+      return container;
+    }
 
     function parseColor(color) {
       if (!color) return;
@@ -140,7 +179,7 @@ function InkRippleService($window, $timeout) {
        * @returns {string} rgba color with 0.1 alpha
        */
       function rgbToRGBA(color) {
-        return color.replace(')', ', 0.1)').replace('(', 'a(')
+        return color.replace(')', ', 0.1)').replace('(', 'a(');
       }
 
     }
@@ -148,7 +187,7 @@ function InkRippleService($window, $timeout) {
     function removeElement(elem, wait) {
       ripples.splice(ripples.indexOf(elem), 1);
       if (ripples.length === 0) {
-        rippleContainer && rippleContainer.css({ backgroundColor: '' });
+        getRippleContainer().css({ backgroundColor: '' });
       }
       $timeout(function () { elem.remove(); }, wait, false);
     }
@@ -255,8 +294,11 @@ function InkRippleService($window, $timeout) {
           height = Math.max(top, height - top);
           size = 2 * Math.sqrt(Math.pow(width, 2) + Math.pow(height, 2));
         } else {
-          multiplier = options.isFAB ? 1.1 : 0.8;
-          size = Math.max(width, height) * multiplier;
+          multiplier = options.fullRipple ? 1.1 : 0.8;
+          size = Math.sqrt(Math.pow(width, 2) + Math.pow(height, 2)) * multiplier;
+          if (options.fitRipple) {
+            size = Math.min(height, width, size);
+          }
         }
         return size;
       }
@@ -268,11 +310,11 @@ function InkRippleService($window, $timeout) {
        * @param {number} the left cursor offset
        * @param {number} the top cursor offset
        *
-       * @returns {{backgroundColor: *, width: string, height: string, marginLeft: string, marginTop: string}}
+       * @returns {{backgroundColor: string, borderColor: string, width: string, height: string}}
        */
       function getRippleCss(size, left, top) {
-        var rect,
-            css = {
+        var rect = node.getBoundingClientRect(),
+            css  = {
               backgroundColor: rgbaToRGB(color),
               borderColor: rgbaToRGB(color),
               width: size + 'px',
@@ -289,7 +331,6 @@ function InkRippleService($window, $timeout) {
         if (options.center) {
           css.left = css.top = '50%';
         } else {
-          rect = node.getBoundingClientRect();
           css.left = Math.round((left - rect.left) / container.prop('offsetWidth') * 100) + '%';
           css.top = Math.round((top - rect.top) / container.prop('offsetHeight') * 100) + '%';
         }
@@ -304,56 +345,42 @@ function InkRippleService($window, $timeout) {
          * @returns {string} rgb color
          */
         function rgbaToRGB(color) {
-          return color.replace('rgba', 'rgb').replace(/,[^\)\,]+\)/, ')');
+          return color.replace('rgba', 'rgb').replace(/,[^\),]+\)/, ')');
         }
-      }
-
-      /**
-       * Gets the current ripple container
-       * If there is no ripple container, it creates one and returns it
-       *
-       * @returns {angular.element} ripple container element
-       */
-      function getRippleContainer() {
-        if (rippleContainer) return rippleContainer;
-        var container = rippleContainer = angular.element('<div class="md-ripple-container"></div>');
-        element.append(container);
-        return container;
       }
     }
 
     /**
      * Handles user input start and stop events
      *
-     * @param {event} event fired by hammer.js
      */
-    function onInput(ev) {
-      var ripple, index;
-      if (ev.eventType === Hammer.INPUT_START && ev.isFirst && isRippleAllowed()) {
-        ripple = createRipple(ev.center.x, ev.center.y);
-        isHeld = true;
-      } else if (ev.eventType === Hammer.INPUT_END && ev.isFinal) {
-        isHeld = false;
-        index = ripples.length - 1;
-        ripple = ripples[index];
-        $timeout(function () { updateElement(ripple); }, 0, false);
-      }
+    function onPressDown(ev) {
+      if (!isRippleAllowed()) return;
 
-      /**
-       * Determines if the ripple is allowed
-       *
-       * @returns {boolean} true if the ripple is allowed, false if not
-       */
-      function isRippleAllowed() {
-        var parent = node.parentNode;
-        var grandparent = parent && parent.parentNode;
-        var ancestor = grandparent && grandparent.parentNode;
-        return !node.hasAttribute('disabled') &&
-          !(parent && parent.hasAttribute && parent.hasAttribute('disabled')) &&
-          !(grandparent && grandparent.hasAttribute('disabled')) &&
-          !(ancestor && ancestor.hasAttribute('disabled'));
+      createRipple(ev.pointer.x, ev.pointer.y);
+      isHeld = true;
+    }
+    function onPressUp() {
+      isHeld = false;
+      var ripple = ripples[ ripples.length - 1 ];
+      $timeout(function () { updateElement(ripple); }, 0, false);
+    }
+
+    /**
+     * Determines if the ripple is allowed
+     *
+     * @returns {boolean} true if the ripple is allowed, false if not
+     */
+    function isRippleAllowed() {
+      var parent = node.parentNode;
+      var grandparent = parent && parent.parentNode;
+      var ancestor = grandparent && grandparent.parentNode;
+      return !isDisabled(node) && !isDisabled(parent) && !isDisabled(grandparent) && !isDisabled(ancestor);
+      function isDisabled (elem) {
+        return elem && elem.hasAttribute && elem.hasAttribute('disabled');
       }
     }
+
   }
 }
 

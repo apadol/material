@@ -16,76 +16,107 @@ var TestUtil = {
       };
     });
     // Un-mock focus after the test is done
-    test.after(function() {
+    afterEach(function() {
       angular.element.prototype.focus = focus;
     });
   },
 
-  /**
-   * Create a fake version of $$rAF that does things asynchronously
-   */
-  mockRaf: function() {
-    module('ng', function($provide) {
-      $provide.value('$$rAF', mockRaf);
-
-      function mockRaf(cb) {
-        cb();
-      }
-      mockRaf.debounce = function(cb) {
-        return function() {
-          cb.apply(this, arguments);
-        };
-      };
-    });
-  }
 };
 
 beforeEach(function() {
 
-  module('material.core.theming', function($mdThemingProvider) {
-    // Create a test version of every default palette, using a copy of the below palette.
-    var defaultPalette = {
-      '50': 'ffebee', '100': 'ffcdd2', '200': 'ef9a9a', '300': 'e57373',
-      '400': 'ef5350', '500': 'f44336', '600': 'e53935', '700': 'd32f2f',
-      '800': 'c62828', '900': 'b71c1c', 'A100': 'ff8a80', 'A200': 'ff5252', 
-      'A400': 'ff1744', 'A700': 'd50000',
-      'contrastDefaultColor': 'light',
-      'contrastDarkColors': ['50', '100', '200', '300', '400', 'A100']
+  /**
+   * Create a fake version of $$rAF that does things synchronously
+   */
+  module('ng', function($provide) {
+    $provide.value('$$rAF', mockRaf);
+
+    function mockRaf(cb) {
+      cb();
+    }
+    mockRaf.throttle = function(cb) {
+      return function() {
+        cb.apply(this, arguments);
+      };
     };
-    (
-      'red pink purple deep-purple indigo blue light-blue cyan teal green light-green lime ' +
-      'yellow amber orange deep-orange brown grey blue-grey'
-    ).split(' ').forEach(function(themeName) {
-      $mdThemingProvider.definePalette(themeName, angular.extend({}, defaultPalette));
-    });
+    mockRaf.flush = angular.noop;
+
   });
 
-  this.addMatchers({
-    // toHaveClass matcher from angularjs test helpers
-    toHaveClass: function(clazz) {
-      this.message = function() {
-        return "Expected '" + angular.mock.dump(this.actual) +
-          (this.isNot ? ' not' : '') + " to have class '" + clazz + "'.";
-      };
-      var classes = clazz.trim().split(/\s+/);
-      for (var i=0; i<classes.length; ++i) {
-        if (!angular.element(this.actual).hasClass(classes[i])) {
-          return false;
+  jasmine.addMatchers({
+
+    toHaveClass: function() {
+      return {
+        compare: function(actual, expected) {
+          var results = { pass : true };
+          var classes = expected.trim().split(/\s+/);
+
+          for (var i=0; i<classes.length; ++i) {
+            if (!angular.element(actual).hasClass(classes[i])) {
+              results.pass = false;
+            }
+          }
+
+          var negation = !results.pass ? "" : " not ";
+
+          results.message = "";
+          results.message += "Expected '";
+          results.message += angular.mock.dump(actual);
+          results.message += negation + "to have class '" + expected + "'.";
+
+          return results;
         }
-      }
-      return true;
+      };
     },
+
     /**
      * A helper to match the type of a given value
      * @example expect(1).toBeOfType('number')
      */
     toBeOfType: function(type) {
-      this.message = function() {
-        return "Expected " + angular.mock.dump(this.actual) + " of type " +
-          (typeof this.actual) + (this.isNot ? ' not ' : '') + " to have type '" + type + "'.";
+      return {
+        compare: function(actual, expected) {
+          var results = {
+              pass : typeof actual == expected
+           };
+
+          var negation = !results.pass ? "" : " not ";
+
+          results.message = "";
+          results.message += "Expected ";
+          results.message += angular.mock.dump(actual) + " of type ";
+          results.message += (typeof actual);
+          results.message += negation + "to have type '" + type + "'.";
+
+          return results;
+        }
       };
-      return typeof this.actual == type;
+    },
+
+    toHaveFields: function() {
+      return {
+        compare: function(actual, expected) {
+          var results = { pass : true  };
+
+          for (var key in expected) {
+            if (!(actual || {}).hasOwnProperty(key) || !angular.equals(actual[key], expected[key])) {
+              results.pass = false;
+            }
+          }
+
+          var negation = !results.pass ? "" : " not ";
+
+          results.message = "";
+          results.message += "Expected ";
+          results.message += angular.mock.dump(actual) + " of type ";
+          results.message += (typeof actual);
+          results.message += negation + "to have fields matching '" + angular.mock.dump(expected);
+
+          return results;
+        }
+      };
     }
+
   });
 
 });

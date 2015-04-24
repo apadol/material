@@ -1,20 +1,39 @@
 $card-margin: 8px !default;
+$card-padding: 16px !default;
 $card-box-shadow: $whiteframe-shadow-z1 !default;
 
 md-card {
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
+  margin: $card-margin;
 
   box-shadow: $card-box-shadow;
 
-  > img {
-    order: 0;
+  > img,
+  > :not(md-card-content) img {
     width: 100%;
   }
 
   md-card-content {
-    order: 1;
-    margin: $card-margin;
+    padding: $card-padding;
+  }
+  md-action-bar {
+    margin: 0;
+
+    .md-button {
+      margin-bottom: $card-margin;
+      margin-top: $card-margin;
+    }
+  }
+  md-card-footer {
+    padding: $card-padding;
   }
 }
+
+@media screen and (-ms-high-contrast: active) {
+  md-card {
+    border: 1px solid #fff;
+  }
+}
+

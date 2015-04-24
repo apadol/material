@@ -62,8 +62,10 @@ module.exports = function(gulp, IS_RELEASE_BUILD) {
         var name = split.pop();
         var moduleName = 'material.' + split.pop() + '.' + name;
 
+        utils.copyDemoAssets(name, 'src/components/', 'dist/docs/demo-partials/');
+
         utils.readModuleDemos(moduleName, function(demoId) {
-          return lazypipe() 
+          return lazypipe()
             .pipe(gulpif, /.css$/, transformCss(demoId))
             .pipe(gulp.dest, 'dist/docs/demo-partials/' + name)
             ();
@@ -107,10 +109,9 @@ module.exports = function(gulp, IS_RELEASE_BUILD) {
 
   gulp.task('docs-js', ['docs-app', 'docs-html2js', 'demos', 'build'], function() {
     return gulp.src([
-      'bower_components/angularytics/dist/angularytics.js',
-      'bower_components/hammerjs/hammer.js',
+      'node_modules/angularytics/dist/angularytics.js',
       'dist/angular-material.js',
-      'dist/docs/js/**/*.js',
+      'dist/docs/js/**/*.js'
     ])
       .pipe(concat('docs.js'))
       .pipe(gulpif(IS_RELEASE_BUILD, uglify()))
@@ -121,7 +122,7 @@ module.exports = function(gulp, IS_RELEASE_BUILD) {
     return gulp.src([
       'dist/angular-material.css',
       'dist/themes/*.css',
-      'docs/app/css/highlightjs-github.css',
+      'docs/app/css/highlightjs-material.css',
       'docs/app/css/layout-demo.css',
       'docs/app/css/style.css'
     ])

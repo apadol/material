@@ -9,7 +9,7 @@ describe('$mdThemingProvider', function() {
     module('material.core.theming', function($mdThemingProvider, $provide) {
       themingProvider = $mdThemingProvider;
 
-      testPalette = themingProvider._PALETTES.testPalette = {
+      testPalette = themingProvider._PALETTES.testPalette = themingProvider._PALETTES.otherTestPalette = {
         '50': 'ffebee',
         '100': 'ffcdd2',
         '200': 'ef9a9a',
@@ -25,15 +25,17 @@ describe('$mdThemingProvider', function() {
         'A400': 'ff1744',
         'A700': 'd50000',
         'contrastDefaultColor': 'light',
-        'contrastDarkColors': ['50', '100', '200', '300', '400', 'A100']
+        'contrastDarkColors': ['50', '100', '200', '300', '400', 'A100'],
+        'contrastStrongLightColors': ['900']
       };
       defaultTheme = themingProvider.theme('default')
-        .primaryColor('testPalette')
-        .warnColor('testPalette')
-        .accentColor('testPalette')
-        .backgroundColor('testPalette');
+        .primaryPalette('testPalette')
+        .warnPalette('testPalette')
+        .accentPalette('otherTestPalette')
+        .backgroundPalette('testPalette');
 
       testTheme = themingProvider.theme('test');
+
     });
     startAngular();
   }
@@ -67,7 +69,7 @@ describe('$mdThemingProvider', function() {
         testTheme.dark();
         expect(testTheme.colors.background.hues['hue-3']).toBe(darkBackground['hue-3']);
 
-        testTheme.backgroundColor('testPalette', {
+        testTheme.backgroundPalette('testPalette', {
           'hue-3': '50'
         });
         testTheme.dark(false);
@@ -79,7 +81,7 @@ describe('$mdThemingProvider', function() {
       var parentTheme;
       beforeEach(function() {
         themingProvider.definePalette('parentPalette', angular.extend({}, testPalette));
-        parentTheme = themingProvider.theme('parent').primaryColor('parentPalette');
+        parentTheme = themingProvider.theme('parent').primaryPalette('parentPalette');
       });
       it('allows extension by string', function() {
         var childTheme = themingProvider.theme('child', 'parent');
@@ -101,21 +103,21 @@ describe('$mdThemingProvider', function() {
       });
       it('allows specifying a custom hue map', function() {
         expect(testTheme.colors.primary.hues['hue-1']).not.toBe('50');
-        testTheme.primaryColor('testPalette', {
+        testTheme.primaryPalette('testPalette', {
           'hue-1': '50'
         });
         expect(testTheme.colors.primary.hues['hue-1']).toBe('50');
       });
       it('errors on invalid key in hue map', function() {
         expect(function() {
-          testTheme.primaryColor('testPalette', {
+          testTheme.primaryPalette('testPalette', {
             'invalid-key': '100'
           });
         }).toThrow();
       });
       it('errors on invalid value in hue map', function() {
         expect(function() {
-          testTheme.primaryColor('testPalette', {
+          testTheme.primaryPalette('testPalette', {
             'hue-1': 'invalid-value'
           });
         }).toThrow();
@@ -152,6 +154,7 @@ describe('$mdThemingProvider', function() {
 
     function parse(str) {
       return themingProvider._parseRules(testTheme, 'primary', str)
+        .join('')
         .split(/\}(?!(\}|'|"|;))/)
         .filter(function(val) { return !!val; })
         .map(function(rule) {
@@ -165,15 +168,15 @@ describe('$mdThemingProvider', function() {
     }
 
     it('errors if given a theme with invalid palettes', function() {
-      testTheme.primaryColor('invalidPalette');
+      testTheme.primaryPalette('invalidPalette');
       expect(function() {
-        themingProvider._parseRules(testTheme, 'primary', '');
+        themingProvider._parseRules(testTheme, 'primary', '').join('');
       }).toThrow();
     });
     it('replaces THEME_NAME', function() {
       expect(themingProvider._parseRules(
         testTheme, 'primary', '.md-THEME_NAME-theme {}'
-      )).toContain('.md-test-theme {}');
+      ).join('')).toContain('.md-test-theme {}');
     });
     describe('parses foreground text and shadow', function() {
       it('for a light theme', function() {
@@ -204,14 +207,20 @@ describe('$mdThemingProvider', function() {
       });
     });
     it('parses contrast colors', function() {
-      testTheme.primaryColor('testPalette', {
+      testTheme.primaryPalette('testPalette', {
         'default': '50'
       });
       expect(parse('.md-THEME_NAME-theme { color: "{{primary-contrast}}"; } ')[0].content)
-        .toEqual('color: rgb(0,0,0);');
+        .toEqual('color: rgba(0,0,0,0.87);');
 
-      testTheme.primaryColor('testPalette', {
+      testTheme.primaryPalette('testPalette', {
         'default': '800'
+      });
+      expect(parse('{ color: "{{primary-contrast}}"; }')[0].content)
+        .toEqual('color: rgba(255,255,255,0.87);');
+
+      testTheme.primaryPalette('testPalette', {
+        'default': '900'
       });
       expect(parse('{ color: "{{primary-contrast}}"; }')[0].content)
         .toEqual('color: rgb(255,255,255);');
@@ -340,6 +349,10 @@ describe('$mdTheming service', function() {
     expect(child.hasClass('md-dark-theme')).toBe(false);
     expect(child.hasClass('md-space-theme')).toBe(true);
   }));
+
+  it('exposes a getter for the default theme', inject(function($mdTheming) {
+    expect($mdTheming.defaultTheme()).toBe('default');
+  }));
 });
 
 describe('md-theme directive', function() {
@@ -354,6 +367,24 @@ describe('md-theme directive', function() {
     $rootScope.$apply('themey = "blue"');
     expect(ctrl.$mdTheme).toBe('blue');
   }));
+
+  it('warns when an unregistered theme is used', function() {
+    inject(function($log, $compile, $rootScope) {
+      spyOn($log, 'warn');
+      var el = $compile('<div md-theme="unregistered"></div>')($rootScope);
+      $rootScope.$apply();
+      expect($log.warn).toHaveBeenCalled();
+    });
+  });
+
+  it('does not warn when a registered theme is used', function() {
+    inject(function($log, $compile, $rootScope) {
+      spyOn($log, 'warn');
+      var el = $compile('<div md-theme="default"></div>')($rootScope);
+      $rootScope.$apply();
+      expect($log.warn.calls.count()).toBe(0);
+    });
+  });
 });
 
 describe('md-themable directive', function() {

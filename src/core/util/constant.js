@@ -19,7 +19,10 @@ function MdConstantFactory($$rAF, $sniffer) {
       LEFT_ARROW : 37,
       UP_ARROW : 38,
       RIGHT_ARROW : 39,
-      DOWN_ARROW : 40
+      DOWN_ARROW : 40,
+      TAB : 9,
+      BACKSPACE: 8,
+      DELETE: 46
     },
     CSS: {
       /* Constants */
@@ -27,6 +30,7 @@ function MdConstantFactory($$rAF, $sniffer) {
       ANIMATIONEND: 'animationend' + (webkit ? ' webkitAnimationEnd' : ''),
 
       TRANSFORM: vendorProperty('transform'),
+      TRANSFORM_ORIGIN: vendorProperty('transformOrigin'),
       TRANSITION: vendorProperty('transition'),
       TRANSITION_DURATION: vendorProperty('transitionDuration'),
       ANIMATION_PLAY_STATE: vendorProperty('animationPlayState'),
@@ -42,7 +46,15 @@ function MdConstantFactory($$rAF, $sniffer) {
       'gt-md': '(min-width: 960px)',
       'lg': '(min-width: 960px) and (max-width: 1200px)',
       'gt-lg': '(min-width: 1200px)'
-    }
+    },
+    MEDIA_PRIORITY: [
+      'gt-lg',
+      'lg',
+      'gt-md',
+      'md',
+      'gt-sm',
+      'sm'
+    ]
   };
 }
 

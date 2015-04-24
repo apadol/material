@@ -1,12 +1,22 @@
-$button-line-height: 25px !default;
-$button-padding: 2px 6px 3px !default;
+$button-line-height: 3.60rem !default;
+$button-padding: 0 0.600rem !default;
+$button-margin: 0.600rem 0.800rem !default;
+$button-min-width: 8.800rem !default;
 
 // Fab buttons
-$button-fab-width: 56px !default;
-$button-fab-height: 56px !default;
-$button-fab-padding: 16px !default;
+$button-fab-width: 5.600rem !default;
+$button-fab-height: 5.600rem !default;
+$button-fab-line-height: 5.600rem !default;
+$button-fab-padding: 1.60rem !default;
+$button-fab-mini-width: 4.00rem !default;
+$button-fab-mini-height: 4.00rem !default;
+$button-fab-mini-line-height: 4.00rem !default;
 
-$button-fab-toast-offset: $button-fab-height * 0.75;
+$button-fab-toast-offset: $button-fab-height * 0.75 !default;
+
+$icon-button-height: 4.800rem !default;
+$icon-button-width: 4.800rem !default;
+$icon-button-margin: 0.600rem !default;
 
 /**
  * Position a FAB button.
@@ -22,40 +32,57 @@ $button-fab-toast-offset: $button-fab-height * 0.75;
 }
 
 .md-button {
+  box-sizing: border-box;
+  color: currentColor;
 
   user-select: none;
   position: relative; //for child absolute-positioned <canvas>
 
   outline: none;
   border: 0;
-  padding: 6px;
-  margin: 0;
+  display: inline-block;
+  padding: $button-padding;
+  margin: $button-margin;
+  line-height: $button-line-height;
+  height: $button-line-height;
   background: transparent;
   white-space: nowrap;
+  // override for FAB, icon buttons, etc.
+  min-width: $button-min-width;
 
   text-align: center;
 
   // Always uppercase buttons
   text-transform: uppercase;
   font-weight: 500;
+  font-size: $body-font-size-base;
   font-style: inherit;
   font-variant: inherit;
-  font-size: inherit;
   font-family: inherit;
-  line-height: inherit;
   text-decoration: none;
 
   cursor: pointer;
   overflow: hidden;   // for ink containment
 
   transition: box-shadow $swift-ease-out-duration $swift-ease-out-timing-function,
-              background-color $swift-ease-out-duration $swift-ease-out-timing-function,
-              transform $swift-ease-out-duration $swift-ease-out-timing-function;
+              background-color $swift-ease-out-duration $swift-ease-out-timing-function;
 
-  &.ng-hide {
+  *,
+  *:before,
+  *:after {
+    box-sizing: border-box;
+  }
+  &:focus {
+    outline: none;
+  }
+
+  &:hover, &:focus {
+    text-decoration: none;
+  }
+
+  &.ng-hide, &.ng-leave {
     transition: none;
   }
-;
 
   &.md-cornered {
     border-radius: 0;
@@ -67,11 +94,19 @@ $button-fab-toast-offset: $button-fab-height * 0.75;
   }
 
   &.md-raised {
-    transform: translate3d(0, 0, 0);
-
     &:not([disabled]) {
       @extend .md-shadow-bottom-z-1;
     }
+  }
+
+  &.md-icon-button {
+    margin: 0 $icon-button-margin;
+    height: $icon-button-height;
+    min-width: 0;
+    line-height: $icon-button-height;
+    padding-left: 0;
+    padding-right: 0;
+    width: $icon-button-width;
   }
 
   &.md-fab {
@@ -83,23 +118,35 @@ $button-fab-toast-offset: $button-fab-height * 0.75;
 
     z-index: $z-index-fab;
 
+    line-height: $button-fab-line-height;
+    min-width: 0;
     width: $button-fab-width;
     height: $button-fab-height;
-
-    border-radius: 50%;
+    vertical-align: middle;
 
     @extend .md-shadow-bottom-z-1;
     border-radius: 50%;
+    background-clip: padding-box;
     overflow: hidden;
 
-    transform: translate3d(0,0,0);
-
     transition: 0.2s linear;
-    transition-property: transform, box-shadow;
+    transition-property: background-color, box-shadow;
+    .md-ripple-container {
+      border-radius: 50%;
+      background-clip: padding-box;
+      overflow: hidden;
+      // The following hack causes Safari to respect overflow hidden for ripples
+      -webkit-mask-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAA5JREFUeNpiYGBgAAgwAAAEAAGbA+oJAAAAAElFTkSuQmCC');
+    }
 
     md-icon {
-      line-height: $button-fab-height;
       margin-top: 0;
+    }
+
+    &.md-mini {
+      line-height: $button-fab-mini-line-height;
+      width: $button-fab-mini-width;
+      height: $button-fab-mini-height;
     }
 
   }
@@ -107,9 +154,10 @@ $button-fab-toast-offset: $button-fab-height * 0.75;
   &:not([disabled]) {
     &.md-raised,
     &.md-fab {
-      &:focus,
-      &:hover {
-        transform: translate3d(0, -1px, 0);
+      &.md-focused {
+        @extend .md-shadow-bottom-z-1;
+      }
+      &:active {
         @extend .md-shadow-bottom-z-2;
       }
     }
@@ -121,7 +169,7 @@ $button-fab-toast-offset: $button-fab-height * 0.75;
   .md-button.md-fab-top-right {
     transform: translate3d(0, $button-fab-toast-offset, 0);
     &:not([disabled]) {
-      &:focus,
+      &.md-focused,
       &:hover {
         transform: translate3d(0, $button-fab-toast-offset - 1, 0);
       }
@@ -133,14 +181,13 @@ $button-fab-toast-offset: $button-fab-height * 0.75;
   .md-button.md-fab-bottom-right {
     transform: translate3d(0, -$button-fab-toast-offset, 0);
     &:not([disabled]) {
-      &:focus,
+      &.md-focused,
       &:hover {
         transform: translate3d(0, -$button-fab-toast-offset - 1, 0);
       }
     }
   }
 }
-
 
 .md-button-group {
   display: flex;
@@ -169,5 +216,11 @@ $button-fab-toast-offset: $button-fab-height * 0.75;
   &:last-child {
     border-right-width: 1px;
     border-radius: 0px 2px 2px 0px;
+  }
+}
+@media screen and (-ms-high-contrast: active) {
+  .md-button.md-raised,
+  .md-button.md-fab {
+    border: 1px solid #fff;
   }
 }

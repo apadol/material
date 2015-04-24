@@ -52,6 +52,11 @@ md-slider {
   display: block;
   margin-left: 4px;
   margin-right: 4px;
+  padding: 0;
+
+  .md-slider-wrapper {
+    position: relative;
+  }
 
   /**
    * Track
@@ -84,9 +89,9 @@ md-slider {
   .md-thumb-container {
     position: absolute;
     left: 0;
-    top: 0;
-    transform: translate3d(0,0,0);
-    transition: transform 0.1s linear;
+    top: 50%;
+    transform: translate3d(-50%,-50%,0);
+    transition: left 0.1s linear;
   }
   .md-thumb {
     z-index: 1;
@@ -197,7 +202,7 @@ md-slider {
   }
 
   /* Don't animate left/right while panning */
-  &.panning {
+  &.dragging {
     .md-thumb-container,
     .md-track-fill {
       transition: none;
@@ -267,3 +272,10 @@ md-slider {
     }
   }
 }
+
+@media screen and (-ms-high-contrast: active) {
+  md-slider.md-default-theme .md-track {
+    border-bottom: 1px solid #fff;
+  }
+}
+

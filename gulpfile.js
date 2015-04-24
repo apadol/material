@@ -8,7 +8,6 @@ var glob = require('glob').sync;
 var gulp = require('gulp');
 var karma = require('karma').server;
 var lazypipe = require('lazypipe');
-var mergeStream = require('merge-stream');
 var path = require('path');
 var pkg = require('./package.json');
 var series = require('stream-series');
@@ -39,6 +38,7 @@ var IS_RELEASE_BUILD = !!argv.release;
 var IS_DEMO_BUILD = (!!argv.module || !!argv.m || !!argv.c);
 var BUILD_MODE = argv.mode;
 var VERSION = argv.version || pkg.version;
+var SHA = argv.sha;
 
 /** Grab-bag of build configuration. */
 var config = {
@@ -54,10 +54,9 @@ var config = {
     '!src/core/**/*.spec.js'
   ],
   jsFiles: [
-    'src/core/**/*.js'
+    'src/**/*.js'
   ],
   themeBaseFiles: [
-    'src/core/style/color-palette.scss',
     'src/core/style/variables.scss',
     'src/core/style/mixins.scss'
   ],
@@ -66,6 +65,10 @@ var config = {
     'src/core/style/variables.scss',
     'src/core/style/mixins.scss',
     'src/core/style/structure.scss',
+    'src/core/style/typography.scss',
+    'src/core/style/layout.scss'
+  ],
+  scssStandaloneFiles: [
     'src/core/style/layout.scss'
   ],
   paths: 'src/{components,services}/**',
@@ -81,12 +84,12 @@ var buildModes = {
     useBower: false
   },
   'demos': {
-    transform: gutil.noop,
+    transform: utils.addJsWrapper,
     outputDir: path.join(config.outputDir, 'demos') + path.sep,
     useBower: false
   },
   'default': {
-    transform: gutil.noop,
+    transform: utils.addJsWrapper,
     outputDir: path.join(config.outputDir, 'modules/js') + path.sep,
     useBower: true
   }
@@ -110,11 +113,15 @@ require('./docs/gulpfile')(gulp, IS_RELEASE_BUILD);
 gulp.task('default', ['build']);
 gulp.task('validate', ['jshint', 'karma']);
 gulp.task('changelog', function(done) {
-  changelog({
+  var options = {
     repository: 'https://github.com/angular/material',
     version: VERSION,
     file: 'CHANGELOG.md'
-  }, function(err, log) {
+  };
+  if (SHA) {
+    options.from = SHA;
+  }
+  changelog(options, function(err, log) {
     fs.writeFileSync(__dirname + '/CHANGELOG.md', log);
   });
 });
@@ -148,13 +155,26 @@ gulp.task('karma', function(done) {
   };
 
   gutil.log('Running unit tests on unminified source.');
+  buildJs(true);
   karma.start(karmaConfig, testMinified);
 
   function testMinified() {
     gutil.log('Running unit tests on minified source.');
-    buildJs(true);
-    karmaConfig.releaseMode = true;
-    karma.start(karmaConfig, done);
+    process.env.KARMA_TEST_COMPRESSED = true;
+    karma.start(karmaConfig, testMinifiedJquery);
+  }
+
+  function testMinifiedJquery() {
+    gutil.log('Running unit tests on minified source w/ jquery.');
+    process.env.KARMA_TEST_COMPRESSED = true;
+    process.env.KARMA_TEST_JQUERY = true;
+    karma.start(karmaConfig, clearEnv);
+  }
+
+  function clearEnv() {
+    process.env.KARMA_TEST_COMPRESSED = undefined;
+    process.env.KARMA_TEST_JQUERY = undefined;
+    done();
   }
 });
 
@@ -162,7 +182,8 @@ gulp.task('karma-watch', function(done) {
   karma.start({
     singleRun:false,
     autoWatch:true,
-    configFile: __dirname + '/config/karma.conf.js'
+    configFile: __dirname + '/config/karma.conf.js',
+    browsers : argv.browsers ? argv.browsers.trim().split(',') : ['Chrome']
   },done);
 });
 
@@ -177,26 +198,28 @@ gulp.task('karma-sauce', function(done) {
  *
  ** ***************************************** */
 
-gulp.task('build', ['build-scss', 'build-js']);
+gulp.task('build', ['build-resources', 'build-scss', 'build-js']);
+
+gulp.task('build-resources', function() {
+  return gulp.src(['material-font/*'])
+    .pipe(gulp.dest(path.join(config.outputDir, 'material-font')));
+});
 
 gulp.task('build-all-modules', function() {
-  return gulp.src(['src/components/*', 'src/core/'])
-    .pipe(through2.obj(function(folder, enc, next) {
-      var moduleId = folder.path.indexOf('components') > -1 ?
-        'material.components.' + path.basename(folder.path) :
-        'material.' + path.basename(folder.path);
-
-      var stream;
-      if (IS_RELEASE_BUILD && BUILD_MODE.useBower) {
-        stream = mergeStream(buildModule(moduleId, true), buildModule(moduleId, false));
-      } else {
-        stream = buildModule(moduleId, false);
-      }
-
-      stream.on('end', function() {
-        next();
-      });
-    }));
+  return series(gulp.src(['src/components/*', 'src/core/'])
+      .pipe(through2.obj(function(folder, enc, next) {
+        var moduleId = folder.path.indexOf('components') > -1
+            ? 'material.components.' + path.basename(folder.path)
+            : 'material.' + path.basename(folder.path);
+        var stream = (IS_RELEASE_BUILD && BUILD_MODE.useBower)
+            ? series(buildModule(moduleId, true), buildModule(moduleId, false))
+            : buildModule(moduleId, false);
+        stream.on('end', function() { next(); });
+      })),
+      themeBuildStream()
+          .pipe(BUILD_MODE.transform())
+          .pipe(gulp.dest(path.join(BUILD_MODE.outputDir, 'core')))
+  );
 });
 
 function buildModule(module, isRelease) {
@@ -206,6 +229,8 @@ function buildModule(module, isRelease) {
 
   var name = module.split('.').pop();
   gutil.log('Building ' + module + (isRelease && ' minified' || '') + ' ...');
+
+  utils.copyDemoAssets(name, 'src/components/', 'dist/demos/');
 
   return utils.filesForModule(module)
     .pipe(filterNonCodeFiles())
@@ -219,7 +244,14 @@ function buildModule(module, isRelease) {
 
   function buildMin() {
     return lazypipe()
-      .pipe(gulpif, /.css$/, minifyCss(), uglify({ preserveComments: 'some' }))
+      .pipe(gulpif, /.css$/, minifyCss(),
+        uglify({ preserveComments: 'some' })
+          .on('error', function(e) {
+            console.log('\x07',e.message);
+            return this.end();
+          }
+        )
+      )
       .pipe(rename, function(path) {
         path.extname = path.extname
           .replace(/.js$/, '.min.js')
@@ -268,8 +300,8 @@ function buildModuleStyles(name) {
  *
  ** ***************************************** */
 
-gulp.task('watch', ['build'], function() {
-  gulp.watch('src/**/*', ['build']);
+gulp.task('watch', ['docs'], function() {
+  gulp.watch(['docs/**/*', 'src/**/*'], ['build', 'docs']);
 });
 
 gulp.task('watch-demo', ['build-demo'], function() {
@@ -287,9 +319,20 @@ gulp.task('watch-demo', ['build-demo'], function() {
   return gulp.watch('src/**/*', ['build-demo']);
 });
 
+gulp.task('site', function () {
+  return gulp.src('dist/docs')
+      .pipe(webserver({
+        host: '0.0.0.0',
+        livereload: true,
+        port: LR_PORT,
+        directoryListing: false
+      }));
+});
+
 gulp.task('server', function() {
   return gulp.src('.')
     .pipe(webserver({
+      host: '0.0.0.0',
       livereload: true,
       port: LR_PORT,
       directoryListing: true
@@ -328,16 +371,7 @@ function buildJs(isRelease) {
     .pipe(plumber())
     .pipe(ngAnnotate());
 
-  var themeBuildStream = gulp.src(
-    config.themeBaseFiles.concat(path.join(config.paths, '*-theme.scss'))
-  )
-    .pipe(concat('default-theme.scss'))
-    .pipe(utils.hoistScssVariables())
-    .pipe(sass())
-    .pipe(gulp.dest('dist'))
-    .pipe(utils.cssToNgConstant('material.core', '$MD_THEME_CSS'));
-
-  return series(jsBuildStream, themeBuildStream)
+  return series(jsBuildStream, themeBuildStream())
     .pipe(concat('angular-material.js'))
     .pipe(gulp.dest(config.outputDir))
     .pipe(gulpif(isRelease, lazypipe()
@@ -346,6 +380,15 @@ function buildJs(isRelease) {
       .pipe(gulp.dest, config.outputDir)
       ()
     ));
+}
+
+// builds the theming related css and provides it as a JS const for angular
+function themeBuildStream() {
+  return gulp.src( config.themeBaseFiles.concat(path.join(config.paths, '*-theme.scss')) )
+    .pipe(concat('default-theme.scss'))
+    .pipe(utils.hoistScssVariables())
+    .pipe(sass())
+    .pipe(utils.cssToNgConstant('material.core', '$MD_THEME_CSS'));
 }
 
 
@@ -410,25 +453,58 @@ gulp.task('build-module-demo', function() {
  ** ***************************************** */
 
 gulp.task('build-scss', function() {
-  // var defaultThemeContents = fs.readFileSync('themes/_default-theme.scss');
-  var scssGlob = path.join(config.paths, '*.scss');
+  var modules   = argv['modules'],
+      overrides = argv['override'],
+      dest      = argv['output-dir'] || config.outputDir,
+      filename  = argv['filename'] || 'angular-material',
+      paths     = getPaths();
 
   gutil.log("Building css files...");
-  return gulp.src(config.scssBaseFiles.concat(scssGlob))
+  var streams = [];
+  streams.push(
+    gulp.src(paths)
       .pipe(filterNonCodeFiles())
       .pipe(filter(['**', '!**/*-theme.scss'])) // remove once ported
       .pipe(concat('angular-material.scss'))
       // .pipe(insert.append(defaultThemeContents))
       .pipe(sass())
+      .pipe(rename({ basename: filename }))
       .pipe(autoprefix())
       .pipe(insert.prepend(config.banner))
-      .pipe(gulp.dest(config.outputDir))
+      .pipe(gulp.dest(dest))
       .pipe(gulpif(IS_RELEASE_BUILD, lazypipe()
           .pipe(minifyCss)
           .pipe(rename, {extname: '.min.css'})
-          .pipe(gulp.dest, config.outputDir)
+          .pipe(gulp.dest, dest)
         ()
-      ));
+      ))
+  );
+  if (IS_RELEASE_BUILD) {
+    var baseVars = fs.readFileSync('src/core/style/variables.scss', 'utf8').toString();
+    streams.push(
+      gulp.src(config.scssStandaloneFiles)
+        .pipe(insert.prepend(baseVars))
+        .pipe(sass())
+        .pipe(autoprefix())
+        .pipe(insert.prepend(config.banner))
+        .pipe(rename({prefix: 'angular-material-'}))
+        .pipe(gulp.dest(path.join(dest, 'modules', 'css')))
+    );
+  }
+  return series(streams);
+  function getPaths () {
+    var paths = config.scssBaseFiles.slice();
+    if (modules) {
+      paths.push.apply(paths, modules.split(',').map(function (module) {
+        return 'src/components/' + module + '/*.scss';
+      }));
+    } else {
+      paths.push(path.join(config.paths, '*.scss'));
+    }
+    overrides && paths.unshift(overrides);
+    console.log(paths);
+    return paths;
+  }
 });
 
 /** *****************************************

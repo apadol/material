@@ -1,6 +1,3 @@
-(function() {
-'use strict';
-
 /*
  * @ngdoc module
  * @name material.components.sticky
@@ -65,7 +62,7 @@ function MdSticky($document, $mdConstant, $compile, $$rAF, $mdUtil) {
 
     // Refresh elements is very expensive, so we use the debounced
     // version when possible.
-    var debouncedRefreshElements = $$rAF.debounce(refreshElements);
+    var debouncedRefreshElements = $$rAF.throttle(refreshElements);
 
     // setupAugmentedScrollEvents gives us `$scrollstart` and `$scroll`,
     // more reliable than `scroll` on android.
@@ -74,6 +71,7 @@ function MdSticky($document, $mdConstant, $compile, $$rAF, $mdUtil) {
     contentEl.on('$scroll', onScroll);
 
     var self;
+    var stickyBaseoffset = contentEl.prop('offsetTop');
     return self = {
       prev: null,
       current: null, //the currently stickied item
@@ -89,6 +87,7 @@ function MdSticky($document, $mdConstant, $compile, $$rAF, $mdUtil) {
     // Add an element and its sticky clone to this content's sticky collection
     function add(element, stickyClone) {
       stickyClone.addClass('md-sticky-clone');
+      stickyClone.css('top', stickyBaseoffset + 'px');
 
       var item = {
         element: element,
@@ -299,4 +298,3 @@ function MdSticky($document, $mdConstant, $compile, $$rAF, $mdUtil) {
   }
 
 }
-})();

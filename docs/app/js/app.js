@@ -1,12 +1,13 @@
-var DocsApp = angular.module('docsApp', ['ngMaterial', 'ngRoute', 'angularytics'])
+var DocsApp = angular.module('docsApp', ['ngMaterial', 'ngRoute', 'angularytics', 'ngMessages'])
 
 .config([
+  'SERVICES',
   'COMPONENTS',
   'DEMOS',
   'PAGES',
   '$routeProvider',
   '$mdThemingProvider',
-function(COMPONENTS, DEMOS, PAGES, $routeProvider, $mdThemingProvider) {
+function(SERVICES, COMPONENTS, DEMOS, PAGES, $routeProvider, $mdThemingProvider) {
   $routeProvider
     .when('/', {
       templateUrl: 'partials/home.tmpl.html'
@@ -15,10 +16,28 @@ function(COMPONENTS, DEMOS, PAGES, $routeProvider, $mdThemingProvider) {
       templateUrl: function(params){
         return 'partials/layout-' + params.tmpl + '.tmpl.html';
       }
+    })
+    .when('/layout/', {
+      redirectTo: function() {
+        return "/layout/container";
+      }
+    })
+    .when('/demo/', {
+      redirectTo: function() {
+        return DEMOS[0].url;
+      }
+    })
+    .when('/api/', {
+      redirectTo: function() {
+        return COMPONENTS[0].docs[0].url;
+      }
+    })
+    .when('/getting-started', {
+      templateUrl: 'partials/getting-started.tmpl.html'
     });
 
-
   $mdThemingProvider.theme('docs-dark', 'default')
+    .primaryPalette('yellow')
     .dark();
 
   angular.forEach(PAGES, function(pages, area) {
@@ -42,6 +61,18 @@ function(COMPONENTS, DEMOS, PAGES, $routeProvider, $mdThemingProvider) {
         },
         controller: 'ComponentDocCtrl'
       });
+    });
+  });
+
+  angular.forEach(SERVICES, function(service) {
+    service.url = '/' + service.url;
+    $routeProvider.when(service.url, {
+      templateUrl: service.outputPath,
+      resolve: {
+        component: function() { return undefined; },
+        doc: function() { return service; }
+      },
+      controller: 'ComponentDocCtrl'
     });
   });
 
@@ -79,42 +110,20 @@ function(Angularytics, $rootScope,$timeout) {
 }])
 
 .factory('menu', [
+  'SERVICES',
   'COMPONENTS',
   'DEMOS',
   'PAGES',
   '$location',
   '$rootScope',
-function(COMPONENTS, DEMOS, PAGES, $location, $rootScope) {
+function(SERVICES, COMPONENTS, DEMOS, PAGES, $location, $rootScope) {
 
   var sections = [{
-    name: 'Layout',
-    pages: [{
-      name: 'Container Elements',
-      id: 'layoutContainers',
-      url: '/layout/container'
-    },{
-      name: 'Grid System',
-      id: 'layoutGrid',
-      url: '/layout/grid'
-    },{
-      name: 'Child Alignment',
-      id: 'layoutAlign',
-      url: '/layout/alignment'
-    },{
-      name: 'Options',
-      id: 'layoutOptions',
-      url: '/layout/options'
-    }]
+    name: 'Getting Started',
+    url: '/getting-started',
+    type: 'link'
   }];
 
-  var apiDocs = {};
-  COMPONENTS.forEach(function(component) {
-    component.docs.forEach(function(doc) {
-      if (angular.isDefined(doc.private)) return;
-      apiDocs[doc.type] = apiDocs[doc.type] || [];
-      apiDocs[doc.type].push(doc);
-    });
-  });
   var demoDocs = [];
   angular.forEach(DEMOS, function(componentDemos) {
     demoDocs.push({
@@ -123,26 +132,109 @@ function(COMPONENTS, DEMOS, PAGES, $location, $rootScope) {
     });
   });
 
-  sections.unshift({
+  sections.push({
     name: 'Demos',
-    pages: demoDocs.sort(sortByName)
+    pages: demoDocs.sort(sortByName),
+    type: 'toggle'
   });
 
-  angular.forEach(PAGES, function(pages, area) {
-    sections.push({
-      name: area,
-      pages: pages
+  sections.push();
+
+  sections.push({
+    name: 'Customization',
+    type: 'heading',
+    children: [{
+      name: 'CSS',
+      type: 'toggle',
+      pages: [{
+        name: 'Typography',
+        url: '/CSS/typography',
+        type: 'link'
+      }]
+    },{
+      name: 'Theming',
+      type: 'toggle',
+      pages: [{
+        name: 'Introduction and Terms',
+        url: '/Theming/01_introduction',
+        type: 'link'
+      },
+      {
+        name: 'Declarative Syntax',
+        url: '/Theming/02_declarative_syntax',
+        type: 'link'
+      },
+      {
+        name: 'Configuring a Theme',
+        url: '/Theming/03_configuring_a_theme',
+        type: 'link'
+      },
+      {
+        name: 'Multiple Themes',
+        url: '/Theming/04_multiple_themes',
+        type: 'link'
+      }]
+    }]
+  });
+
+  var docsByModule = {};
+  var apiDocs = {};
+  COMPONENTS.forEach(function(component) {
+    component.docs.forEach(function(doc) {
+      if (angular.isDefined(doc.private)) return;
+      apiDocs[doc.type] = apiDocs[doc.type] || [];
+      apiDocs[doc.type].push(doc);
+
+      docsByModule[doc.module] = docsByModule[doc.module] || [];
+      docsByModule[doc.module].push(doc);
     });
   });
 
-  sections.push({
-    name: 'Services',
-    pages: apiDocs.service.sort(sortByName)
+  SERVICES.forEach(function(service) {
+    if (angular.isDefined(service.private)) return;
+    apiDocs[service.type] = apiDocs[service.type] || [];
+    apiDocs[service.type].push(service);
+
+    docsByModule[service.module] = docsByModule[service.module] || [];
+    docsByModule[service.module].push(service);
   });
+
   sections.push({
-    name: 'Directives',
-    pages: apiDocs.directive.sort(sortByName)
+    name: 'API Reference',
+    type: 'heading',
+    children: [
+    {
+      name: 'Layout',
+      type: 'toggle',
+      pages: [{
+        name: 'Container Elements',
+        id: 'layoutContainers',
+        url: '/layout/container'
+      },{
+        name: 'Grid System',
+        id: 'layoutGrid',
+        url: '/layout/grid'
+      },{
+        name: 'Child Alignment',
+        id: 'layoutAlign',
+        url: '/layout/alignment'
+      },{
+        name: 'Options',
+        id: 'layoutOptions',
+        url: '/layout/options'
+      }]
+    },
+    {
+      name: 'Services',
+      pages: apiDocs.service.sort(sortByName),
+      type: 'toggle'
+    },{
+      name: 'Directives',
+      pages: apiDocs.directive.sort(sortByName),
+      type: 'toggle'
+    }]
   });
+
   function sortByName(a,b) {
     return a.name < b.name ? -1 : 1;
   }
@@ -165,11 +257,10 @@ function(COMPONENTS, DEMOS, PAGES, $location, $rootScope) {
     },
 
     selectPage: function(section, page) {
-      page && page.url && $location.path(page.url);
       self.currentSection = section;
       self.currentPage = page;
     },
-    isPageSelected: function(section, page) {
+    isPageSelected: function(page) {
       return self.currentPage === page;
     }
   };
@@ -180,22 +271,92 @@ function(COMPONENTS, DEMOS, PAGES, $location, $rootScope) {
   }
 
   function onLocationChange() {
-    var activated = false;
     var path = $location.path();
-    sections.forEach(function(section) {
-      section.pages.forEach(function(page) {
-        if (path === page.url) {
-          self.selectSection(section);
-          self.selectPage(section, page);
-          activated = true;
-        }
-      });
-    });
-    if (!activated) {
-      self.selectSection(sections[3]);
+
+    if (path == '/') {
+      self.selectSection(null);
+      self.selectPage(null, null);
+      return;
     }
+
+    var matchPage = function(section, page) {
+      if (path === page.url) {
+        self.selectSection(section);
+        self.selectPage(section, page);
+      }
+    };
+
+    sections.forEach(function(section) {
+      if(section.children) {
+        // matches nested section toggles, such as API or Customization
+        section.children.forEach(function(childSection){
+          if(childSection.pages){
+            childSection.pages.forEach(function(page){
+              matchPage(childSection, page);
+            });
+          }
+        });
+      }
+      else if(section.pages) {
+        // matches top-level section toggles, such as Demos
+        section.pages.forEach(function(page) {
+          matchPage(section, page);
+        });
+      }
+      else if (section.type === 'link') {
+        // matches top-level links, such as "Getting Started"
+        matchPage(section, section);
+      }
+    });
   }
 }])
+
+.directive('menuLink', function() {
+  return {
+    scope: {
+      section: '='
+    },
+    templateUrl: 'partials/menu-link.tmpl.html',
+    link: function($scope, $element) {
+      var controller = $element.parent().controller();
+
+      $scope.isSelected = function() {
+        return controller.isSelected($scope.section);
+      };
+
+      $scope.focusSection = function() {
+        // set flag to be used later when
+        // $locationChangeSuccess calls openPage()
+        controller.autoFocusContent = true;
+      };
+    }
+  };
+})
+
+.directive('menuToggle', function() {
+  return {
+    scope: {
+      section: '='
+    },
+    templateUrl: 'partials/menu-toggle.tmpl.html',
+    link: function($scope, $element) {
+      var controller = $element.parent().controller();
+
+      $scope.isOpen = function() {
+        return controller.isOpen($scope.section);
+      };
+      $scope.toggle = function() {
+        controller.toggleOpen($scope.section);
+      };
+
+      var parentNode = $element[0].parentNode.parentNode.parentNode;
+      if(parentNode.classList.contains('parent-list-item')) {
+        var heading = parentNode.querySelector('h2');
+        $element[0].firstChild.setAttribute('aria-describedby', heading.id);
+      }
+    }
+  };
+})
 
 .controller('DocsCtrl', [
   '$scope',
@@ -207,35 +368,98 @@ function(COMPONENTS, DEMOS, PAGES, $location, $rootScope) {
   'menu',
   '$location',
   '$rootScope',
-function($scope, COMPONENTS, BUILDCONFIG, $mdSidenav, $timeout, $mdDialog, menu, $location, $rootScope) {
+  '$log',
+function($scope, COMPONENTS, BUILDCONFIG, $mdSidenav, $timeout, $mdDialog, menu, $location, $rootScope, $log) {
+  var self = this;
+
   $scope.COMPONENTS = COMPONENTS;
   $scope.BUILDCONFIG = BUILDCONFIG;
-
   $scope.menu = menu;
+
+  $scope.path = path;
+  $scope.goHome = goHome;
+  $scope.openMenu = openMenu;
+  $scope.closeMenu = closeMenu;
+  $scope.isSectionSelected = isSectionSelected;
+
+  $rootScope.$on('$locationChangeSuccess', openPage);
+  $scope.focusMainContent = focusMainContent;
+
+  // Methods used by menuLink and menuToggle directives
+  this.isOpen = isOpen;
+  this.isSelected = isSelected;
+  this.toggleOpen = toggleOpen;
+  this.autoFocusContent = false;
+
 
   var mainContentArea = document.querySelector("[role='main']");
 
-  $rootScope.$on('$locationChangeSuccess', openPage);
+  // *********************
+  // Internal methods
+  // *********************
 
-  $scope.closeMenu = function() {
+  function closeMenu() {
     $timeout(function() { $mdSidenav('left').close(); });
-  };
-  $scope.openMenu = function() {
+  }
+
+  function openMenu() {
     $timeout(function() { $mdSidenav('left').open(); });
-  };
+  }
 
-  $scope.path = function() {
+  function path() {
     return $location.path();
-  };
+  }
 
-  $scope.goHome = function($event) {
+  function goHome($event) {
     menu.selectPage(null, null);
     $location.path( '/' );
-  };
+  }
 
   function openPage() {
     $scope.closeMenu();
-    mainContentArea.focus();
+
+    if (self.autoFocusContent) {
+      focusMainContent();
+      self.autoFocusContent = false;
+    }
+  }
+
+  function focusMainContent($event) {
+    // prevent skip link from redirecting
+    if ($event) { $event.preventDefault(); }
+
+    $timeout(function(){
+      mainContentArea.focus();
+    },90);
+
+  }
+
+  function isSelected(page) {
+    return menu.isPageSelected(page);
+  }
+
+  function isSectionSelected(section) {
+    var selected = false;
+    var openedSection = menu.openedSection;
+    if(openedSection === section){
+      selected = true;
+    }
+    else if(section.children) {
+      section.children.forEach(function(childSection) {
+        if(childSection === openedSection){
+          selected = true;
+        }
+      });
+    }
+    return selected;
+  }
+
+  function isOpen(section) {
+    return menu.isSectionSelected(section);
+  }
+
+  function toggleOpen(section) {
+    menu.toggleSelectSection(section);
   }
 }])
 
@@ -344,6 +568,11 @@ function($rootScope, $scope, component, demos, $http, $templateCache, $q) {
 
 }])
 
+.filter('nospace', function () {
+  return function (value) {
+    return (!value) ? '' : value.replace(/ /g, '');
+  };
+})
 .filter('humanizeDoc', function() {
   return function(doc) {
     if (!doc) return;

@@ -1,4 +1,6 @@
 // See height set globally, depended on by buttons
+
+
 md-toast {
   display: flex;
   position:absolute;
@@ -14,7 +16,7 @@ md-toast {
   font-size: 14px;
   cursor: default;
 
-  max-width: 879px;
+  max-width: 100%;
   max-height: 40px;
 
   height: $toast-height;
@@ -67,13 +69,16 @@ md-toast {
 
   .md-action {
     line-height: 19px;
-    padding-left: 24px;
+    margin-left: 24px;
     cursor: pointer;
     text-transform: uppercase;
     float: right;
+
+    &.md-button {
+      min-width: 0;
+    }
   }
 }
-
 
 @media (max-width: $layout-breakpoint-sm) {
   md-toast {
@@ -106,7 +111,7 @@ md-toast {
       top: $toast-margin;
     }
 
-    /* 
+    /*
      * When the toast doesn't take up the whole screen,
      * make it rotate when the user swipes it away
      */
@@ -126,5 +131,19 @@ md-toast {
         }
       }
     }
+  }
+}
+
+@media (min-width: $layout-breakpoint-lg) {
+  md-toast {
+    max-width: $baseline-grid * 71;
+  }
+}
+
+
+
+@media screen and (-ms-high-contrast: active) {
+  md-toast {
+    border: 1px solid #fff;
   }
 }

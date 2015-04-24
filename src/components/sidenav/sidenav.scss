@@ -1,15 +1,28 @@
 $sidenav-default-width: 304px !default;
+$sidenav-min-space: 56px !default;
 
 md-sidenav {
+  box-sizing: border-box;
   position: absolute;
 
   width: $sidenav-default-width;
   min-width: $sidenav-default-width;
+  max-width: $sidenav-default-width;
   bottom: 0;
   z-index: $z-index-sidenav;
   background-color: white;
   overflow: auto;
   flex-direction: column;
+
+  *,
+  *:before,
+  *:after {
+    box-sizing: border-box;
+  }
+
+  ul {
+    list-style: none;
+  }
 
   &.md-closed {
     display: none;
@@ -36,6 +49,7 @@ md-sidenav {
   &.md-locked-open {
     width: $sidenav-default-width;
     min-width: $sidenav-default-width;
+    max-width: $sidenav-default-width;
   }
 
   &.md-locked-open,
@@ -89,5 +103,20 @@ md-sidenav {
   transform: translate3d(-100%, 0, 0);
   &.md-closed {
     transform: translate3d(0%, 0, 0);
+  }
+}
+
+@media (max-width: $sidenav-default-width + $sidenav-min-space) {
+  md-sidenav {
+    width: 85%;
+  }
+}
+
+@media screen and (-ms-high-contrast: active) {
+  .md-sidenav-left {
+    border-right: 1px solid #fff;
+  }
+  .md-sidenav-right {
+    border-left: 1px solid #fff;
   }
 }
